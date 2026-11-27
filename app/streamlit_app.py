@@ -1,4 +1,4 @@
-"""Interactive Streamlit Application for Movie Recommendation System.
+"""Interactive Streamlit Application for CoRate Cinema.
 
 Provides an interactive user interface for:
 - Movie search & item-to-item similarity
@@ -29,11 +29,90 @@ from src.model_training import train_and_save_pipeline
 
 # Page config
 st.set_page_config(
-    page_title="Movie Recommender System",
+    page_title="CoRate Cinema — Movies Matched to Your Taste",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+
+def inject_custom_css():
+    """Applies clean card styling, hero banner, and genre badges."""
+    st.markdown(
+        """
+        <style>
+        .hero-banner {
+            padding: 1.4rem 1.6rem;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(229, 9, 20, 0.16), rgba(30, 41, 59, 0.55));
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            margin-bottom: 1.1rem;
+        }
+        .hero-title {
+            font-size: 2.1rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin: 0;
+            line-height: 1.2;
+        }
+        .hero-tagline {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #F87171;
+            margin-top: 0.25rem;
+            margin-bottom: 0.45rem;
+        }
+        .hero-sub {
+            font-size: 0.94rem;
+            opacity: 0.88;
+            margin: 0;
+        }
+        .movie-card {
+            padding: 1.1rem 1.25rem;
+            border-radius: 12px;
+            background-color: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            margin-bottom: 0.9rem;
+        }
+        .rec-card {
+            padding: 0.85rem 1rem;
+            border-radius: 10px;
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 0.65rem;
+        }
+        .genre-tag {
+            display: inline-block;
+            padding: 0.18rem 0.55rem;
+            margin: 0.15rem 0.25rem 0.15rem 0;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            background-color: rgba(229, 9, 20, 0.18);
+            border: 1px solid rgba(229, 9, 20, 0.35);
+        }
+        .score-badge {
+            display: inline-block;
+            padding: 0.22rem 0.6rem;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            background-color: rgba(34, 197, 94, 0.16);
+            color: #4ADE80;
+            border: 1px solid rgba(34, 197, 94, 0.35);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def render_genre_badges(genres_str: str) -> str:
+    """Converts pipe-separated genres (e.g. Action|Comedy) into clean tags."""
+    if not genres_str or pd.isna(genres_str):
+        return "<span class='genre-tag'>General</span>"
+    parts = [g.strip() for g in str(genres_str).split("|") if g.strip()]
+    return "".join(f"<span class='genre-tag'>{g}</span>" for g in parts)
 
 
 @st.cache_resource
@@ -54,11 +133,21 @@ def load_recommender_model():
 
 
 def main():
-    # Header
-    st.title("🎬 Movie Recommendation System")
+    inject_custom_css()
+
+    # Header Banner
     st.markdown(
-        "**Collaborative Filtering Engine** powered by the **MovieLens Latest Small** dataset. "
-        "Explore movie similarities, personalized user recommendations, cold-start handling, and model evaluation metrics."
+        """
+        <div class="hero-banner">
+            <p class="hero-title">🎬 CoRate Cinema</p>
+            <p class="hero-tagline">Movies Matched to Your Taste</p>
+            <p class="hero-sub">
+                Discover similar films, personalized user recommendations, cold-start picks, and evaluation insights
+                powered by collaborative filtering on the MovieLens dataset.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
     # Load Model
@@ -69,7 +158,7 @@ def main():
         return
 
     # Sidebar Controls
-    st.sidebar.header("⚙️ Configuration")
+    st.sidebar.header("⚙️ Studio Controls")
     top_k = st.sidebar.slider("Number of Recommendations (Top-K)", min_value=5, max_value=25, value=10, step=1)
     cf_method = st.sidebar.radio(
         "Recommendation Strategy",
@@ -87,8 +176,8 @@ def main():
     # Tabs
     tab1, tab2, tab3, tab4 = st.tabs([
         "🔍 Movie Similarity",
-        "👤 Personalized Recommendations",
-        "⭐ Cold-Start & Popular Fallback",
+        "👤 Personalized Picks",
+        "⭐ Cold-Start & Popular",
         "📈 Analytics & Evaluation"
     ])
 
@@ -96,8 +185,8 @@ def main():
     # TAB 1: MOVIE SIMILARITY
     # --------------------------------------------------------------------------
     with tab1:
-        st.subheader("Find Similar Movies (Item-Item Cosine Similarity)")
-        st.caption("Select or search for any movie to see which films share the strongest co-rating patterns.")
+        st.subheader("Find Similar Movies")
+        st.caption("Pick any film to see which movies share the strongest viewer co-rating patterns.")
 
         all_titles = sorted(model.movies_df["title"].unique())
         default_index = all_titles.index("Toy Story (1995)") if "Toy Story (1995)" in all_titles else 0
@@ -108,22 +197,48 @@ def main():
             movie_record = model.movies_df[model.movies_df["title"] == selected_title].iloc[0]
             target_movie_id = int(movie_record["movieId"])
 
-            col_a, col_b = st.columns([1, 2])
+            col_a, col_b = st.columns([1.1, 2.2])
             with col_a:
-                st.info(f"**Title:** {selected_title}\n\n**Genres:** {movie_record['genres']}\n\n**Movie ID:** `{target_movie_id}`")
+                st.markdown(
+                    f"""
+                    <div class="movie-card">
+                        <div style="font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em; opacity:0.7;">Selected Film</div>
+                        <h4 style="margin:0.35rem 0 0.5rem 0;">{selected_title}</h4>
+                        <div style="margin-bottom:0.65rem;">{render_genre_badges(movie_record['genres'])}</div>
+                        <div style="font-size:0.86rem; opacity:0.8;">Movie ID: <code>{target_movie_id}</code></div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
             with col_b:
                 with st.spinner("Calculating cosine similarities..."):
                     similar_movies = model.recommend_similar_movies(movie_id=target_movie_id, top_k=top_k)
 
                 if similar_movies:
-                    sim_df = pd.DataFrame(similar_movies)
-                    sim_df.columns = ["Movie ID", "Title", "Genres", "Cosine Similarity"]
-                    st.dataframe(
-                        sim_df.style.background_gradient(subset=["Cosine Similarity"], cmap="Blues"),
-                        use_container_width=True,
-                        hide_index=True
-                    )
+                    st.markdown(f"**Top {len(similar_movies)} Similar Films**")
+                    for rank, item in enumerate(similar_movies, start=1):
+                        sim_val = item.get("similarity", item.get("cosine_similarity", 0.0))
+                        st.markdown(
+                            f"""
+                            <div class="rec-card">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+                                    <div>
+                                        <strong>#{rank} · {item['title']}</strong>
+                                        <span style="opacity:0.65; font-size:0.82rem;"> (ID: {item['movieId']})</span>
+                                    </div>
+                                    <span class="score-badge">Similarity: {float(sim_val):.3f}</span>
+                                </div>
+                                <div style="margin-top:0.35rem;">{render_genre_badges(item['genres'])}</div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                    with st.expander("View as Sortable Table"):
+                        sim_df = pd.DataFrame(similar_movies)
+                        sim_df.columns = ["Movie ID", "Title", "Genres", "Cosine Similarity"]
+                        st.dataframe(sim_df, use_container_width=True, hide_index=True)
                 else:
                     st.warning("No similar movies found above the similarity threshold.")
 
@@ -132,7 +247,7 @@ def main():
     # --------------------------------------------------------------------------
     with tab2:
         st.subheader("Personalized User Recommendations")
-        st.caption("Generate personalized movie recommendations for existing users or test cold-start fallback with a new ID.")
+        st.caption("Get tailored movie picks for an existing viewer ID, or enter a new ID (>610) to test cold-start fallback.")
 
         col_input, col_action = st.columns([2, 1])
         with col_input:
@@ -147,13 +262,12 @@ def main():
         with col_action:
             st.write("")
             st.write("")
-            recommend_btn = st.button("Generate Recommendations", type="primary")
+            st.button("Generate Recommendations", type="primary")
 
-        # Display User's Past Ratings (if known)
         is_known_user = user_id_input in model.user_to_idx
         if is_known_user:
             user_watched_ids = model.user_watched.get(user_id_input, set())
-            st.markdown(f"**User {user_id_input} History:** Watched and rated **{len(user_watched_ids)}** movies.")
+            st.info(f"**User {user_id_input}** has rated **{len(user_watched_ids)}** movies in the training set.")
 
             with st.expander("View User's Top Rated Movies (from Training Data)", expanded=False):
                 u_idx = model.user_to_idx[user_id_input]
@@ -171,60 +285,82 @@ def main():
                 history_df = pd.DataFrame(user_history).sort_values(by="Rating", ascending=False)
                 st.dataframe(history_df.head(10), use_container_width=True, hide_index=True)
         else:
-            st.warning(f"⚠️ User {user_id_input} is a **Brand New User (Cold-Start)**. System will automatically fall back to Bayesian Popular Movies.")
+            st.warning(f"⚠️ User {user_id_input} is a **Brand New User (Cold-Start)**. CoRate Cinema will fall back to Bayesian Popular Movies.")
 
-        # Recommendations
         with st.spinner("Generating recommendations..."):
             recs = model.recommend(user_id=user_id_input, method=cf_method, top_k=top_k)
 
         if recs:
-            st.markdown(f"### Top {top_k} Recommendations for User {user_id_input}")
-            recs_df = pd.DataFrame(recs)
+            st.markdown(f"### Top {top_k} Picks for User {user_id_input}")
+            for rank, rec in enumerate(recs, start=1):
+                st.markdown(
+                    f"""
+                    <div class="rec-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+                            <div><strong>#{rank} · {rec['title']}</strong></div>
+                            <span class="score-badge">★ {float(rec['predicted_score']):.2f} · {rec.get('method', cf_method)}</span>
+                        </div>
+                        <div style="margin-top:0.35rem;">{render_genre_badges(rec['genres'])}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
-            display_cols = ["title", "genres", "predicted_score", "method"]
-            rename_map = {
-                "title": "Title",
-                "genres": "Genres",
-                "predicted_score": "Predicted Score (Stars)",
-                "method": "Recommendation Method"
-            }
-            recs_df = recs_df[[c for c in display_cols if c in recs_df.columns]].rename(columns=rename_map)
+            with st.expander("View as Data Table"):
+                recs_df = pd.DataFrame(recs)
+                display_cols = ["title", "genres", "predicted_score", "method"]
+                rename_map = {
+                    "title": "Title",
+                    "genres": "Genres",
+                    "predicted_score": "Predicted Score (Stars)",
+                    "method": "Recommendation Method"
+                }
+                recs_df = recs_df[[c for c in display_cols if c in recs_df.columns]].rename(columns=rename_map)
+                st.dataframe(recs_df, use_container_width=True, hide_index=True)
 
-            st.dataframe(
-                recs_df.style.background_gradient(subset=["Predicted Score (Stars)"], cmap="Greens"),
-                use_container_width=True,
-                hide_index=True
-            )
-            st.success("✅ Already-watched movies have been strictly excluded from these recommendations.")
+            st.success("✅ Already-watched movies are excluded from these recommendations.")
 
     # --------------------------------------------------------------------------
     # TAB 3: COLD-START & POPULAR FALLBACK
     # --------------------------------------------------------------------------
     with tab3:
-        st.subheader("Trending & Popular Fallback Catalog")
+        st.subheader("Cold-Start & Popular Fallback")
         st.markdown(
-            "When a new user has no past ratings, collaborative filtering cannot compute similarities. "
-            "To solve this **Cold-Start Problem**, we employ the **IMDb Bayesian Weighted Rating** formula calculated strictly on the training partition:\n\n"
+            "When a new viewer has no rating history yet, collaborative filtering has no past tastes to compare. "
+            "CoRate Cinema uses an **IMDb Bayesian Weighted Rating** on the training split so popular, well-rated classics surface first:\n\n"
             r"$$\text{WR} = \left(\frac{v}{v + m}\right) R + \left(\frac{m}{v + m}\right) C$$"
             "\nwhere $v$ is rating count, $m$ is minimum threshold, $R$ is average movie rating, and $C$ is catalog mean."
         )
 
         popular_recs = model.recommend_popular(top_k=top_k)
-        pop_df = pd.DataFrame(popular_recs)[["title", "genres", "predicted_score", "rating_count"]]
-        pop_df.columns = ["Title", "Genres", "Bayesian Score", "Rating Count"]
+        for rank, item in enumerate(popular_recs, start=1):
+            st.markdown(
+                f"""
+                <div class="rec-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+                        <div>
+                            <strong>#{rank} · {item['title']}</strong>
+                            <span style="opacity:0.7; font-size:0.84rem;"> ({item['rating_count']} ratings)</span>
+                        </div>
+                        <span class="score-badge">Bayesian Score: {float(item['predicted_score']):.2f}</span>
+                    </div>
+                    <div style="margin-top:0.35rem;">{render_genre_badges(item['genres'])}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-        st.dataframe(
-            pop_df.style.background_gradient(subset=["Bayesian Score"], cmap="Oranges"),
-            use_container_width=True,
-            hide_index=True
-        )
+        with st.expander("View Popular Fallback Table"):
+            pop_df = pd.DataFrame(popular_recs)[["title", "genres", "predicted_score", "rating_count"]]
+            pop_df.columns = ["Title", "Genres", "Bayesian Score", "Rating Count"]
+            st.dataframe(pop_df, use_container_width=True, hide_index=True)
 
     # --------------------------------------------------------------------------
     # TAB 4: ANALYTICS & MODEL EVALUATION
     # --------------------------------------------------------------------------
     with tab4:
-        st.subheader("Model Evaluation & Exploratory Visualizations")
-        st.markdown("Quantitative benchmark results evaluated on held-out test data (20% partition):")
+        st.subheader("Analytics & Model Evaluation")
+        st.markdown("Benchmark metrics evaluated on the 20% held-out test split:")
 
         metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
         with metric_col1:
@@ -264,4 +400,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
